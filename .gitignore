@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Antigravity IDE
+.agent/
+GEMINI.md
+
+# Environment
+.env
+
+# Tool directories
+output/
+temp/
+
+# Generated intermediate files
+*.filter
+*.ass
+
+# PyInstaller
+*.spec
+
+# User config
+.subtitle_tool_config
+
+# OS
+Thumbs.db
+.DS_Store
