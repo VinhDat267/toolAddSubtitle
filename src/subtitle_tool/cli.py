@@ -1,4 +1,4 @@
-"""CLI entry point for subtitle-tool."""
+"""CLI entry point for subtitle-tool with multi-language and export support."""
 
 from __future__ import annotations
 
@@ -7,8 +7,20 @@ import logging
 import sys
 
 from subtitle_tool import __version__
-from subtitle_tool.config import AppConfig, WatermarkConfig, WhisperConfig
-from subtitle_tool.pipeline import process_channel, process_single_video
+from subtitle_tool.config import (
+    EXPORT_FORMATS,
+    SUPPORTED_LANGUAGES,
+    WHISPER_MODELS,
+    AppConfig,
+    WatermarkConfig,
+    WhisperConfig,
+)
+from subtitle_tool.pipeline import (
+    process_channel,
+    process_channel_parallel,
+    process_single_video,
+    process_urls_parallel,
+)
 from subtitle_tool.processor import check_ffmpeg
 
 
@@ -23,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="subtitle-tool",
-        description="Auto-add English subtitles + watermark to YouTube videos",
+        description="Auto-add subtitles + watermark to YouTube videos (multi-language)",
     )
 
     # Input source (mutually exclusive)
@@ -32,6 +44,8 @@ def build_parser() -> argparse.ArgumentParser:
     source.add_argument("--channel", help="YouTube channel URL to batch process")
     source.add_argument("--check-quality", metavar="SRT_FILE",
                         help="Analyze SRT file quality (standalone)")
+    source.add_argument("--convert", metavar="SRT_FILE",
+                        help="Convert SRT to other formats (VTT, JSON)")
 
     # Options
     parser.add_argument("--output", "-o", default="./output", help="Output directory (default: ./output)")
@@ -39,13 +53,34 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--watermark", "-w", default="Daisy", help="Watermark text (default: Daisy)")
     parser.add_argument(
         "--model",
-        choices=["tiny", "base", "small", "medium", "large-v3"],
+        choices=list(WHISPER_MODELS),
         default="medium",
         help="Whisper model size (default: medium)",
     )
+    parser.add_argument(
+        "--language", "-l",
+        choices=list(SUPPORTED_LANGUAGES.keys()),
+        default="en",
+        help="Subtitle language (default: en, use 'auto' for auto-detect)",
+    )
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto", help="Compute device")
     parser.add_argument("--ffmpeg", default="ffmpeg", help="Path to FFmpeg binary")
+    parser.add_argument(
+        "--export",
+        choices=list(EXPORT_FORMATS),
+        default="srt",
+        help="Export format: srt, vtt, or both (default: srt)",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of concurrent workers for batch processing (default: 1, max: 6)",
+    )
+
+    # Version
+    parser.add_argument("--version", "-V", action="version", version=f"%(prog)s {__version__}")
 
     return parser
 
@@ -57,6 +92,21 @@ def main() -> None:
 
     setup_logging(args.verbose)
     logger = logging.getLogger(__name__)
+
+    # Handle SRT conversion (no FFmpeg needed)
+    if args.convert:
+        from pathlib import Path
+        from subtitle_tool.srt_utils import export_to_vtt, export_to_json
+        srt_file = Path(args.convert)
+        if not srt_file.exists():
+            logger.error("SRT file not found: %s", srt_file)
+            sys.exit(1)
+        output_dir = Path(args.output)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        export_to_vtt(srt_file, output_dir / srt_file.with_suffix(".vtt").name)
+        export_to_json(srt_file, output_dir / srt_file.with_suffix(".json").name)
+        logger.info("✅ Conversion complete!")
+        sys.exit(0)
 
     # Check FFmpeg
     if not check_ffmpeg(args.ffmpeg):
@@ -75,7 +125,12 @@ def main() -> None:
     config.max_videos = args.max
     config.ffmpeg_path = args.ffmpeg
     config.watermark = WatermarkConfig(text=args.watermark)
-    config.whisper = WhisperConfig(model_size=args.model, device=args.device)
+    config.whisper = WhisperConfig(
+        model_size=args.model,
+        device=args.device,
+        language=args.language,
+    )
+    config.export_format = args.export
 
     # Standalone quality check mode
     if args.check_quality:
@@ -89,17 +144,35 @@ def main() -> None:
         sys.exit(0 if report.score >= 60 else 1)
 
     if not args.url and not args.channel:
-        parser.error("one of --url, --channel, or --check-quality is required")
+        parser.error("one of --url, --channel, --check-quality, or --convert is required")
 
-    logger.info("Subtitle Tool v%s", __version__)
-    logger.info("Watermark: '%s' | Model: %s | Device: %s", args.watermark, args.model, args.device)
+    # Display config
+    lang_display = SUPPORTED_LANGUAGES.get(args.language, args.language)
+    logger.info("🎬 Subtitle Tool v%s", __version__)
+    logger.info(
+        "  Watermark: '%s' | Model: %s | Language: %s | Device: %s | Export: %s",
+        args.watermark, args.model, lang_display, args.device, args.export,
+    )
+    if args.workers > 1:
+        logger.info("  🚀 Workers: %d (multi-threaded)", args.workers)
 
     # Process
     if args.url:
         result = process_single_video(args.url, config)
+        if result.success:
+            logger.info("📊 Quality: %.0f (%s)", result.quality_score, result.quality_grade)
+            if result.export_paths:
+                for fmt, path in result.export_paths.items():
+                    logger.info("  📝 %s: %s", fmt.upper(), path.name)
         sys.exit(0 if result.success else 1)
     else:
-        results = process_channel(args.channel, config)
+        # Batch channel processing — parallel or sequential
+        if args.workers > 1:
+            results = process_channel_parallel(
+                args.channel, config, max_workers=args.workers,
+            )
+        else:
+            results = process_channel(args.channel, config)
         success_count = sum(1 for r in results if r.success)
         sys.exit(0 if success_count > 0 else 1)
 

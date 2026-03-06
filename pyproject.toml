@@ -1,7 +1,7 @@
 [project]
 name = "subtitle-tool"
-version = "1.2.0"
-description = "Auto-add English subtitles + watermark to YouTube videos using Whisper AI"
+version = "2.0.0"
+description = "Auto-add multi-language subtitles + watermark to YouTube videos using Whisper AI"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -12,6 +12,10 @@ dependencies = [
 [project.optional-dependencies]
 gui = [
     "customtkinter>=5.2.0",
+]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
 ]
 
 [project.scripts]

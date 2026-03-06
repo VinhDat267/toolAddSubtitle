@@ -1,3 +1,3 @@
-"""Subtitle Tool - Auto-add English subtitles + watermark to YouTube videos."""
+"""Subtitle Tool - Auto-add multi-language subtitles + watermark to YouTube videos."""
 
-__version__ = "1.2.0"
+__version__ = "2.0.0"

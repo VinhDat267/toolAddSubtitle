@@ -1,4 +1,4 @@
-"""YouTube video downloader using yt-dlp."""
+"""YouTube video downloader using yt-dlp with retry support."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 import yt_dlp
 
 from subtitle_tool.config import MAX_DURATION_SECONDS, AppConfig, get_quality_for_duration
-from subtitle_tool.exceptions import DownloadError, ValidationError
+from subtitle_tool.exceptions import DownloadError, ValidationError, retry
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,7 @@ def _sanitize_filename(title: str) -> str:
     return result[:100].strip()
 
 
+@retry(max_attempts=3, delay=2.0, exceptions=(DownloadError,))
 def download_video(url: str, config: AppConfig) -> VideoInfo:
     """Download a YouTube video with quality based on duration.
 
@@ -118,9 +119,9 @@ def download_video(url: str, config: AppConfig) -> VideoInfo:
         "merge_output_format": "mp4",
         "quiet": False,
         "no_warnings": False,
-        # Download auto-generated English subtitles if available
+        # Download auto-generated subtitles in target language
         "writeautomaticsub": True,
-        "subtitleslangs": ["en"],
+        "subtitleslangs": [config.whisper.language if config.whisper.language != "auto" else "en"],
         "subtitlesformat": "srt",
     }
 

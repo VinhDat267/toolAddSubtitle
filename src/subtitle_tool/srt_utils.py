@@ -1,10 +1,12 @@
-"""SRT subtitle processing utilities."""
+"""SRT subtitle processing utilities with VTT export support."""
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -132,6 +134,17 @@ def _ms_to_timestamp(ms: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
 
 
+def _ms_to_vtt_timestamp(ms: int) -> str:
+    """Convert milliseconds to VTT timestamp (HH:MM:SS.mmm)."""
+    hours = ms // 3600000
+    ms %= 3600000
+    minutes = ms // 60000
+    ms %= 60000
+    seconds = ms // 1000
+    millis = ms % 1000
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
+
+
 @dataclass
 class SrtEntry:
     """Represents a single SRT subtitle entry."""
@@ -183,6 +196,85 @@ def _entries_to_srt(entries: list[SrtEntry]) -> str:
     return "\n".join(lines)
 
 
+# ─── VTT Export ──────────────────────────────────────────────
+
+def export_to_vtt(srt_path: Path, output_path: Path | None = None) -> Path:
+    """Convert an SRT file to WebVTT (VTT) format.
+
+    Args:
+        srt_path: Path to the source .srt file.
+        output_path: Path for the output .vtt file. If None, uses same name.
+
+    Returns:
+        Path to the generated .vtt file.
+    """
+    if output_path is None:
+        output_path = srt_path.with_suffix(".vtt")
+
+    content = srt_path.read_text(encoding="utf-8", errors="replace")
+    entries = _parse_srt(content)
+
+    vtt_lines: list[str] = ["WEBVTT", "Kind: captions", ""]
+
+    for i, entry in enumerate(entries, 1):
+        # Convert SRT timestamps to VTT timestamps (comma → dot)
+        start_ms = _timestamp_to_ms(entry.start)
+        end_ms = _timestamp_to_ms(entry.end)
+        start_vtt = _ms_to_vtt_timestamp(start_ms)
+        end_vtt = _ms_to_vtt_timestamp(end_ms)
+
+        vtt_lines.append(str(i))
+        vtt_lines.append(f"{start_vtt} --> {end_vtt}")
+        vtt_lines.append(entry.text)
+        vtt_lines.append("")
+
+    output_path.write_text("\n".join(vtt_lines), encoding="utf-8")
+    logger.info("📝 Exported VTT: %s (%d entries)", output_path.name, len(entries))
+    return output_path
+
+
+# ─── JSON Export ─────────────────────────────────────────────
+
+def export_to_json(srt_path: Path, output_path: Path | None = None) -> Path:
+    """Export SRT as structured JSON for programmatic use.
+
+    Args:
+        srt_path: Path to the source .srt file.
+        output_path: Path for the output .json file. If None, uses same name.
+
+    Returns:
+        Path to the generated .json file.
+    """
+    if output_path is None:
+        output_path = srt_path.with_suffix(".json")
+
+    content = srt_path.read_text(encoding="utf-8", errors="replace")
+    entries = _parse_srt(content)
+
+    data = {
+        "metadata": {
+            "source": srt_path.name,
+            "entries": len(entries),
+            "exported_at": datetime.now().isoformat(),
+        },
+        "subtitles": [
+            {
+                "index": i,
+                "start": entry.start,
+                "end": entry.end,
+                "start_ms": _timestamp_to_ms(entry.start),
+                "end_ms": _timestamp_to_ms(entry.end),
+                "text": entry.text,
+            }
+            for i, entry in enumerate(entries, 1)
+        ],
+    }
+
+    output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    logger.info("📊 Exported JSON: %s (%d entries)", output_path.name, len(entries))
+    return output_path
+
+
 def generate_subtitle_filterscript(
     srt_path: Path,
     watermark_filter: str,
@@ -211,7 +303,7 @@ def generate_subtitle_filterscript(
 
         # Escape special chars for FFmpeg drawtext filter syntax
         # Order matters: backslash first, then others
-        text = entry.text.replace("'", "\u2019")  # Smart quote for apostrophe
+        text = entry.text.replace("'", "’")  # Smart quote avoids FFmpeg quoting issues
         text = text.replace("\\", "\\\\")
         text = text.replace(":", "\\:")
         text = text.replace(",", "\\,")
