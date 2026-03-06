@@ -78,7 +78,12 @@ def get_video_info(url: str, config: AppConfig | None = None) -> VideoInfo:
     if not _is_youtube_url(url):
         raise ValidationError(f"Not a valid YouTube URL: {url}")
 
-    opts: dict = {"quiet": True, "no_warnings": True, "skip_download": True}
+    opts: dict = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        # Don't specify format — we only need metadata here
+    }
     ffmpeg_dir = _get_ffmpeg_dir(config)
     if ffmpeg_dir:
         opts["ffmpeg_location"] = ffmpeg_dir
@@ -139,7 +144,13 @@ def download_video(url: str, config: AppConfig) -> VideoInfo:
     ffmpeg_dir = _get_ffmpeg_dir(config)
 
     opts: dict = {
-        "format": f"bestvideo[height<={target_height}]+bestaudio/best[height<={target_height}]",
+        # Flexible format: try height-limited first, then best available
+        "format": (
+            f"bestvideo[height<={target_height}]+bestaudio/"
+            f"best[height<={target_height}]/"
+            f"bestvideo+bestaudio/"
+            f"best"
+        ),
         "outtmpl": output_template,
         "merge_output_format": "mp4",
         "quiet": False,
