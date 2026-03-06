@@ -184,7 +184,7 @@ def process_single_video(
 def process_channel(channel_url: str, config: AppConfig) -> list[ProcessingResult]:
     """Process multiple videos from a YouTube channel (sequential)."""
     logger.info("Fetching video list from channel...")
-    urls = list_channel_videos(channel_url, max_count=config.max_videos)
+    urls = list_channel_videos(channel_url, max_count=config.max_videos, config=config)
 
     if not urls:
         logger.warning("No videos found in channel.")
@@ -229,7 +229,7 @@ def process_channel_parallel(
         List of ProcessingResult in original URL order.
     """
     logger.info("Fetching video list from channel...")
-    urls = list_channel_videos(channel_url, max_count=config.max_videos)
+    urls = list_channel_videos(channel_url, max_count=config.max_videos, config=config)
 
     if not urls:
         logger.warning("No videos found in channel.")

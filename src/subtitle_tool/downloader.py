@@ -42,6 +42,12 @@ def _get_ffmpeg_dir(config: AppConfig | None) -> str | None:
     return None
 
 
+def _apply_cookies(opts: dict, config: AppConfig | None) -> None:
+    """Add browser cookies config to yt-dlp options if configured."""
+    if config and config.cookies_browser and config.cookies_browser != "none":
+        opts["cookiesfrombrowser"] = (config.cookies_browser,)
+
+
 def _is_youtube_url(url: str) -> bool:
     """Check if URL is a valid YouTube video or channel URL."""
     return bool(re.match(
@@ -58,6 +64,7 @@ def get_video_info(url: str, config: AppConfig | None = None) -> VideoInfo:
     ffmpeg_dir = _get_ffmpeg_dir(config)
     if ffmpeg_dir:
         opts["ffmpeg_location"] = ffmpeg_dir
+    _apply_cookies(opts, config)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -127,6 +134,7 @@ def download_video(url: str, config: AppConfig) -> VideoInfo:
 
     if ffmpeg_dir:
         opts["ffmpeg_location"] = ffmpeg_dir
+    _apply_cookies(opts, config)
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -154,7 +162,7 @@ def download_video(url: str, config: AppConfig) -> VideoInfo:
     return video_info
 
 
-def list_channel_videos(channel_url: str, max_count: int = 10) -> list[str]:
+def list_channel_videos(channel_url: str, max_count: int = 10, config: AppConfig | None = None) -> list[str]:
     """List video URLs from a YouTube channel (most recent first)."""
     opts = {
         "quiet": True,
@@ -162,6 +170,7 @@ def list_channel_videos(channel_url: str, max_count: int = 10) -> list[str]:
         "extract_flat": True,
         "playlistend": max_count,
     }
+    _apply_cookies(opts, config)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(channel_url, download=False)

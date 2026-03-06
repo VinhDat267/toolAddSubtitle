@@ -38,6 +38,7 @@ SUPPORTED_LANGUAGES = {
 WHISPER_MODELS = ("tiny", "base", "small", "medium", "large-v3")
 COMPUTE_DEVICES = ("auto", "cpu", "cuda")
 EXPORT_FORMATS = ("srt", "vtt", "both")
+SUPPORTED_BROWSERS = ("none", "chrome", "firefox", "edge", "brave", "opera", "safari")
 
 
 @dataclass
@@ -156,6 +157,7 @@ class AppConfig:
     max_videos: int = 10
     ffmpeg_path: str = "ffmpeg"
     export_format: str = "srt"  # "srt", "vtt", or "both"
+    cookies_browser: str = ""  # Browser to extract cookies from (e.g. "chrome", "firefox", "edge")
 
     def __post_init__(self) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)

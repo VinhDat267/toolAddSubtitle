@@ -13,6 +13,7 @@ import customtkinter as ctk
 
 from subtitle_tool.config import (
     EXPORT_FORMATS,
+    SUPPORTED_BROWSERS,
     SUPPORTED_LANGUAGES,
     WHISPER_MODELS,
     AppConfig,
@@ -273,12 +274,22 @@ class SubtitleApp(ctk.CTk):
 
         # Workers (multi-threading)
         wk_col = ctk.CTkFrame(settings1, fg_color="transparent")
-        wk_col.pack(side="left", padx=(0, 0))
+        wk_col.pack(side="left", padx=(0, 10))
         ctk.CTkLabel(wk_col, text="🚀 Workers", font=ctk.CTkFont(size=12)).pack(anchor="w")
         self.workers_var = ctk.StringVar(value="2")
         ctk.CTkOptionMenu(
             wk_col, values=["1", "2", "3", "4"],
             variable=self.workers_var, width=60, height=32,
+        ).pack(pady=(3, 0))
+
+        # Cookies Browser (for YouTube anti-bot bypass)
+        ck_col = ctk.CTkFrame(settings1, fg_color="transparent")
+        ck_col.pack(side="left", padx=(0, 0))
+        ctk.CTkLabel(ck_col, text="🍪 Cookies", font=ctk.CTkFont(size=12)).pack(anchor="w")
+        self.cookies_var = ctk.StringVar(value="none")
+        ctk.CTkOptionMenu(
+            ck_col, values=list(SUPPORTED_BROWSERS),
+            variable=self.cookies_var, width=100, height=32,
         ).pack(pady=(3, 0))
 
         # ─── Settings Row 2: Language + Export + Watermark + Output ───
@@ -575,6 +586,7 @@ class SubtitleApp(ctk.CTk):
             "language": self._get_language_code(),
             "export": self.export_var.get(),
             "watermark": self.wm_entry.get().strip() or "Daisy",
+            "cookies": self.cookies_var.get(),
         }
 
         done_count = 0
@@ -663,6 +675,7 @@ class SubtitleApp(ctk.CTk):
             model = gui_config["model"]
             export_fmt = gui_config["export"]
             watermark_text = gui_config["watermark"]
+            cookies = gui_config.get("cookies", "none")
         else:
             ffmpeg = self.ffmpeg_entry.get().strip() or "ffmpeg"
             lang_code = self._get_language_code()
@@ -670,11 +683,15 @@ class SubtitleApp(ctk.CTk):
             model = self.model_var.get()
             export_fmt = self.export_var.get()
             watermark_text = self.wm_entry.get().strip() or "Daisy"
+            cookies = self.cookies_var.get()
+
+        cookies_browser = cookies if cookies and cookies != "none" else ""
 
         config = AppConfig(
             output_dir=Path(output_dir),
             ffmpeg_path=ffmpeg,
             export_format=export_fmt,
+            cookies_browser=cookies_browser,
         )
         config.whisper = WhisperConfig(
             model_size=model,

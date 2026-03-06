@@ -12,6 +12,7 @@ from subtitle_tool.config import (
     SUPPORTED_LANGUAGES,
     WHISPER_MODELS,
     AppConfig,
+    SUPPORTED_BROWSERS,
     WatermarkConfig,
     WhisperConfig,
 )
@@ -78,6 +79,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Number of concurrent workers for batch processing (default: 1, max: 6)",
     )
+    parser.add_argument(
+        "--cookies",
+        choices=[b for b in SUPPORTED_BROWSERS if b != "none"],
+        default=None,
+        help="Browser to extract cookies from for YouTube anti-bot bypass (e.g. chrome, firefox, edge)",
+    )
 
     # Version
     parser.add_argument("--version", "-V", action="version", version=f"%(prog)s {__version__}")
@@ -131,6 +138,7 @@ def main() -> None:
         language=args.language,
     )
     config.export_format = args.export
+    config.cookies_browser = args.cookies or ""
 
     # Standalone quality check mode
     if args.check_quality:
