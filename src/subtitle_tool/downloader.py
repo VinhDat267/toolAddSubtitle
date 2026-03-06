@@ -43,9 +43,27 @@ def _get_ffmpeg_dir(config: AppConfig | None) -> str | None:
 
 
 def _apply_cookies(opts: dict, config: AppConfig | None) -> None:
-    """Add browser cookies config to yt-dlp options if configured."""
-    if config and config.cookies_browser and config.cookies_browser != "none":
-        opts["cookiesfrombrowser"] = (config.cookies_browser,)
+    """Add cookie authentication to yt-dlp options.
+
+    Supports two modes:
+    1. Browser name (e.g. "chrome", "firefox") → uses cookiesfrombrowser
+    2. File path ending in .txt → uses cookies file directly
+
+    Falls back to cookies.txt in project root if browser cookies fail.
+    """
+    if not config or not config.cookies_browser or config.cookies_browser == "none":
+        return
+
+    value = config.cookies_browser.strip()
+
+    # If it's a path to a cookies.txt file
+    if value.endswith(".txt") and Path(value).is_file():
+        opts["cookiefile"] = value
+        logger.info("🍪 Using cookies file: %s", Path(value).name)
+        return
+
+    # Browser name → try cookiesfrombrowser
+    opts["cookiesfrombrowser"] = (value,)
 
 
 def _is_youtube_url(url: str) -> bool:

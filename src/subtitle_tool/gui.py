@@ -282,15 +282,21 @@ class SubtitleApp(ctk.CTk):
             variable=self.workers_var, width=60, height=32,
         ).pack(pady=(3, 0))
 
-        # Cookies Browser (for YouTube anti-bot bypass)
+        # Cookies (for YouTube anti-bot bypass) - browser or cookies.txt file
         ck_col = ctk.CTkFrame(settings1, fg_color="transparent")
         ck_col.pack(side="left", padx=(0, 0))
         ctk.CTkLabel(ck_col, text="🍪 Cookies", font=ctk.CTkFont(size=12)).pack(anchor="w")
+        ck_row = ctk.CTkFrame(ck_col, fg_color="transparent")
+        ck_row.pack(fill="x", pady=(3, 0))
         self.cookies_var = ctk.StringVar(value="none")
         ctk.CTkOptionMenu(
-            ck_col, values=list(SUPPORTED_BROWSERS),
-            variable=self.cookies_var, width=100, height=32,
-        ).pack(pady=(3, 0))
+            ck_row, values=list(SUPPORTED_BROWSERS),
+            variable=self.cookies_var, width=90, height=32,
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            ck_row, text="📄", width=32, height=32,
+            command=self._browse_cookies,
+        ).pack(side="left")
 
         # ─── Settings Row 2: Language + Export + Watermark + Output ───
         settings2 = ctk.CTkFrame(main, fg_color="transparent")
@@ -471,6 +477,16 @@ class SubtitleApp(ctk.CTk):
         if path:
             self.out_entry.delete(0, "end")
             self.out_entry.insert(0, path)
+
+    def _browse_cookies(self) -> None:
+        """Browse for a cookies.txt file (exported from browser extension)."""
+        path = filedialog.askopenfilename(
+            title="Select cookies.txt file",
+            filetypes=[("Cookies", "*.txt"), ("All", "*.*")],
+        )
+        if path:
+            self.cookies_var.set(path)
+            self._set_status(f"🍪 Cookies file loaded: {Path(path).name}", "#2ecc71")
 
     def _save_ffmpeg_path(self, path: str) -> None:
         (Path.home() / ".subtitle_tool_config").write_text(path, encoding="utf-8")
